@@ -47,6 +47,36 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
     return {"status": "ok", "zendesk_status": r.status_code}
 
 
+def _get_asgi_app():
+    attr_candidates = [
+        "app",
+        "application",
+        "fastapi",
+        "_app",
+        "_application",
+        "_fastapi",
+        "asgi_app",
+        "_asgi_app",
+    ]
+    for attr in attr_candidates:
+        app = getattr(mcp, attr, None)
+        if app is not None:
+            return app
+
+    router = getattr(mcp, "router", None) or getattr(mcp, "_router", None)
+    if router is not None:
+        try:
+            from fastapi import FastAPI
+        except ImportError as exc:  # pragma: no cover - only triggered in minimal envs
+            raise RuntimeError("FastAPI is required to build the SSE app dynamically.") from exc
+
+        fastapi_app = FastAPI()
+        fastapi_app.include_router(router)
+        return fastapi_app
+
+    return None
+
+
 def _run_server():
     port = int(os.getenv("PORT", "3333"))
     host = "0.0.0.0"
@@ -65,9 +95,12 @@ def _run_server():
         mcp.run(**run_kwargs)
         return
 
-    app = getattr(mcp, "app", None) or getattr(mcp, "fastapi", None)
+    app = _get_asgi_app()
     if app is None:
-        raise RuntimeError("FastMCP app handle not found; update the mcp package.")
+        available = ", ".join(sorted(dir(mcp)))
+        raise RuntimeError(
+            f"FastMCP app handle not found; available attrs: {available}"
+        )
 
     import uvicorn
 
