@@ -49,4 +49,4 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "3333"))
     # IMPORTANT: this serves MCP over SSE (and will expose /sse/)
-    mcp.run(transport="sse", host="0.0.0.0", port=port)
+    mcp.run(transport="sse", port=port)
