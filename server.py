@@ -28,9 +28,10 @@ def require_key(ctx: Context):
 
 
 @mcp.tool()
-def slack_post_message(channel: str, message: str, ctx: Context):
+def slack_post_message(text: str, ctx: Context):
     require_key(ctx)
-    slack.chat_postMessage(channel=channel, text=message)
+    channel, message = text.split("|", 1)
+    slack.chat_postMessage(channel=channel.strip(), text=message.strip())
     return {"status": "sent"}
 
 
