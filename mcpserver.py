@@ -19,8 +19,14 @@ zendesk_auth = HTTPBasicAuth(
     os.getenv("ZENDESK_API_TOKEN")
 )
 
-def auth(key: str):
-    if key != API_KEY:
+def auth(authorization: str | None, x_api_key: str | None):
+    token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    elif x_api_key:
+        token = x_api_key
+
+    if token != API_KEY:
         raise HTTPException(401, "Invalid MCP key")
 
 # --- MCP Tools ---
@@ -29,9 +35,10 @@ def auth(key: str):
 def zendesk_add_internal_note(
     ticket_id: str,
     note: str,
-    x_api_key: str = Header(...)
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None)
 ):
-    auth(x_api_key)
+    auth(authorization, x_api_key)
     payload = {
         "ticket": {
             "comment": {
@@ -51,8 +58,9 @@ def zendesk_add_internal_note(
 def slack_post_message(
     channel: str,
     message: str,
-    x_api_key: str = Header(...)
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None)
 ):
-    auth(x_api_key)
+    auth(authorization, x_api_key)
     slack.chat_postMessage(channel=channel, text=message)
     return {"status": "sent"}
