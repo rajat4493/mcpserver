@@ -1,11 +1,16 @@
 import os
 import requests
+from fastapi import FastAPI
 from requests.auth import HTTPBasicAuth
 from slack_sdk import WebClient
 
-from fastmcp import FastMCP, Context
+try:
+    from fastmcp import FastMCP, Context
+except ImportError:  # pragma: no cover - fallback when fastmcp not installed
+    from mcp.server.fastmcp import FastMCP, Context  # type: ignore
 
 mcp = FastMCP("zendesk_slack", stateless_http=True)
+app = FastAPI(redirect_slashes=False)
 
 API_KEY = os.getenv("MCP_API_KEY", "")
 
@@ -47,7 +52,7 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
     return {"status": "ok", "zendesk_status": r.status_code}
 
 
-app = mcp.http_app(path="/mcp/")
+mcp.mount(app, path="/mcp/")
 
 
 if __name__ == "__main__":
