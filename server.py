@@ -1,3 +1,4 @@
+import inspect
 import os
 import requests
 from requests.auth import HTTPBasicAuth
@@ -46,9 +47,33 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
     return {"status": "ok", "zendesk_status": r.status_code}
 
 
+def _run_server():
+    port = int(os.getenv("PORT", "3333"))
+    host = "0.0.0.0"
+    os.environ["PORT"] = str(port)
+
+    sig = inspect.signature(mcp.run)
+    params = sig.parameters
+
+    run_kwargs = {"transport": "sse"}
+    if "host" in params:
+        run_kwargs["host"] = host
+    if "port" in params:
+        run_kwargs["port"] = port
+
+    if "host" in params or "port" in params:
+        mcp.run(**run_kwargs)
+        return
+
+    app = getattr(mcp, "app", None) or getattr(mcp, "fastapi", None)
+    if app is None:
+        raise RuntimeError("FastMCP app handle not found; update the mcp package.")
+
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port)
+
+
 if __name__ == "__main__":
-    port = os.getenv("PORT", "3333")
-    # Ensure downstream server implementations see the desired port.
-    os.environ["PORT"] = port
     # IMPORTANT: this serves MCP over SSE (and will expose /sse/)
-    mcp.run(transport="sse")
+    _run_server()
