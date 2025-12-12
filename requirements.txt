@@ -1,5 +1,3 @@
-fastmcp
-fastapi==0.111.0
+mcp
 slack-sdk==3.27.1
 requests==2.32.3
-uvicorn[standard]==0.30.1
