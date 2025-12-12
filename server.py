@@ -1,3 +1,4 @@
+import inspect
 import os
 import requests
 from fastapi import FastAPI
@@ -9,7 +10,7 @@ try:
 except ImportError:  # pragma: no cover - fallback when fastmcp not installed
     from mcp.server.fastmcp import FastMCP, Context  # type: ignore
 
-mcp = FastMCP("zendesk_slack", stateless_http=True)
+mcp = FastMCP("zendesk_slack")
 app = FastAPI(redirect_slashes=False)
 
 API_KEY = os.getenv("MCP_API_KEY", "")
@@ -52,7 +53,25 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
     return {"status": "ok", "zendesk_status": r.status_code}
 
 
-mcp.mount(app, path="/mcp/")
+def _mount_mcp(app: FastAPI):
+    mount_sig = inspect.signature(mcp.mount)
+    if "path" in mount_sig.parameters:
+        mcp.mount(app, path="/sse")
+        return
+
+    sse_app = getattr(mcp, "sse_app", None)
+    if sse_app is None:
+        available = ", ".join(sorted(dir(mcp)))
+        raise RuntimeError(
+            "FastMCP version does not support mounting with `path` and "
+            "no `sse_app` attribute was found. Available attributes: "
+            f"{available}"
+        )
+
+    app.mount("/sse", sse_app)
+
+
+_mount_mcp(app)
 
 
 if __name__ == "__main__":
