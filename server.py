@@ -1,6 +1,8 @@
 import inspect
 import os
 import requests
+from typing import Callable, Optional
+
 from requests.auth import HTTPBasicAuth
 from slack_sdk import WebClient
 
@@ -46,10 +48,50 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
     return {"status": "ok", "zendesk_status": r.status_code}
 
 
+def _wrap_sse_app_accept(app: Callable):
+    if getattr(app, "_accept_patch_applied", False):  # type: ignore[attr-defined]
+        return app
+
+    async def _wrapped(scope, receive, send):
+        if scope.get("type") == "http" and scope.get("path") == "/sse":
+            headers = list(scope.get("headers") or [])
+            has_accept = False
+            for idx, (key, value) in enumerate(headers):
+                if key.lower() == b"accept":
+                    has_accept = True
+                    if b"text/event-stream" not in value.lower():
+                        headers[idx] = (key, value + b",text/event-stream")
+                    break
+
+            if not has_accept:
+                headers.append((b"accept", b"text/event-stream"))
+
+            scope = dict(scope)
+            scope["headers"] = headers
+
+        await app(scope, receive, send)
+
+    setattr(_wrapped, "_accept_patch_applied", True)
+    return _wrapped
+
+
+def _ensure_sse_app() -> Optional[Callable]:
+    sse_app = getattr(mcp, "sse_app", None)
+    if sse_app is None:
+        return None
+    wrapped = _wrap_sse_app_accept(sse_app)
+    try:
+        setattr(mcp, "sse_app", wrapped)
+    except Exception:
+        pass
+    return wrapped
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))
     host = "0.0.0.0"
     os.environ["PORT"] = str(port)
+    sse_app = _ensure_sse_app()
 
     run_params = inspect.signature(mcp.run).parameters
     run_kwargs = {"transport": "sse"}
@@ -64,7 +106,6 @@ if __name__ == "__main__":
     if supports_direct:
         mcp.run(**run_kwargs)
     else:
-        sse_app = getattr(mcp, "sse_app", None)
         if sse_app is None:
             raise RuntimeError("FastMCP version does not expose `sse_app`; update the package.")
         import uvicorn
