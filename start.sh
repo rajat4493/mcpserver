@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PORT="${PORT:-8000}"
+PORT="${PORT:-3333}"
+export PORT
 
-exec uvicorn server:app --host 0.0.0.0 --port "$PORT"
+exec python server.py
