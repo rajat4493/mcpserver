@@ -47,6 +47,11 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
     return {"status": "ok", "zendesk_status": r.status_code}
 
 
+app = mcp.http_app(path="/mcp/")
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))
-    mcp.run(transport="http", host="0.0.0.0", port=port, path="/sse/")
+    import uvicorn
+
+    uvicorn.run("server:app", host="0.0.0.0", port=port)
