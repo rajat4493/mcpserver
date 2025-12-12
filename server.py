@@ -93,8 +93,10 @@ def _run_server():
         run_kwargs["host"] = host
     if "port" in params:
         run_kwargs["port"] = port
+    if "path" in params:
+        run_kwargs["path"] = "/sse/"
 
-    if "host" in params or "port" in params:
+    if any(key in params for key in ("host", "port", "path")):
         mcp.run(**run_kwargs)
         return
 
