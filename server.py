@@ -49,6 +49,8 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
 
 def _get_asgi_app():
     attr_candidates = [
+        "sse_app",
+        "streamable_http_app",
         "app",
         "application",
         "fastapi",
