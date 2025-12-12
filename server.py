@@ -1,3 +1,4 @@
+import inspect
 import os
 import requests
 from requests.auth import HTTPBasicAuth
@@ -47,5 +48,25 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))
-    # Serve SSE on /sse (required by AgentKit Cloud)
-    mcp.run(transport="sse", host="0.0.0.0", port=port, path="/sse")
+    host = "0.0.0.0"
+    os.environ["PORT"] = str(port)
+
+    run_params = inspect.signature(mcp.run).parameters
+    run_kwargs = {"transport": "sse"}
+    if "host" in run_params:
+        run_kwargs["host"] = host
+    if "port" in run_params:
+        run_kwargs["port"] = port
+    if "path" in run_params:
+        run_kwargs["path"] = "/sse"
+
+    supports_direct = any(param in run_params for param in ("host", "port", "path"))
+    if supports_direct:
+        mcp.run(**run_kwargs)
+    else:
+        sse_app = getattr(mcp, "sse_app", None)
+        if sse_app is None:
+            raise RuntimeError("FastMCP version does not expose `sse_app`; update the package.")
+        import uvicorn
+
+        uvicorn.run(sse_app, host=host, port=port)
