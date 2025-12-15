@@ -152,4 +152,20 @@ if __name__ == "__main__":
             raise RuntimeError("FastMCP version does not expose `sse_app`; update the package.")
         import uvicorn
 
-        uvicorn.run(sse_app, host=host, port=port)
+        uvicorn_params = {"host": host, "port": port}
+        try:
+            run_sig = inspect.signature(uvicorn.run)
+        except (TypeError, ValueError):
+            run_sig = None
+
+        allowed_hosts = os.getenv("UVICORN_ALLOWED_HOSTS", "*")
+        allowed_hosts_list = [
+            entry.strip()
+            for entry in allowed_hosts.split(",")
+            if entry.strip()
+        ] or ["*"]
+
+        if run_sig and "allowed_hosts" in run_sig.parameters:
+            uvicorn_params["allowed_hosts"] = allowed_hosts_list
+
+        uvicorn.run(sse_app, **uvicorn_params)
