@@ -107,7 +107,9 @@ def _wrap_sse_app_accept(app: Callable):
         return app
 
     async def _wrapped(scope, receive, send):
-        if scope.get("type") == "http" and scope.get("path") == "/sse":
+        path = scope.get("path") or ""
+        normalized_path = path.rstrip("/") or "/"
+        if scope.get("type") == "http" and normalized_path == "/sse":
             headers = list(scope.get("headers") or [])
             has_accept = False
             for idx, (key, value) in enumerate(headers):
