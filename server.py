@@ -134,6 +134,36 @@ def zendesk_list_recent_tickets(limit: int = 10, ctx: Context = None):
     return normalized
 
 
+def _get_sse_app():
+    sse_attr = getattr(mcp, "sse_app", None)
+    if sse_attr is None:
+        return None
+    if callable(sse_attr):
+        try:
+            candidate = sse_attr()
+            if candidate is not None:
+                sse_attr = candidate
+        except TypeError:
+            pass
+    return sse_attr
+
+
+def _legacy_run(host: str, port: int):
+    sse_app = _get_sse_app()
+    if sse_app is None:
+        raise RuntimeError("FastMCP version does not expose sse_app; update the mcp package.")
+    import uvicorn
+
+    uvicorn.run(sse_app, host=host, port=port)
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))
-    mcp.run(transport="sse", host="0.0.0.0", port=port)
+    host = "0.0.0.0"
+    try:
+        mcp.run(transport="sse", host=host, port=port)
+    except TypeError as exc:
+        message = str(exc)
+        if "unexpected keyword argument" not in message:
+            raise
+        _legacy_run(host, port)
