@@ -76,10 +76,52 @@ def _wrap_sse_app_accept(app: Callable):
 
 
 def _ensure_sse_app() -> Optional[Callable]:
-    sse_app = getattr(mcp, "sse_app", None)
-    if sse_app is None:
+    sse_attr = getattr(mcp, "sse_app", None)
+    if sse_attr is None:
         return None
-    wrapped = _wrap_sse_app_accept(sse_app)
+
+    candidate = sse_attr
+    if callable(sse_attr):
+        try:
+            sig = inspect.signature(sse_attr)
+        except (TypeError, ValueError):
+            sig = None
+
+        should_call = False
+        requires_path_arg = False
+        if sig is not None:
+            params = list(sig.parameters.values())
+            if params and params[0].name == "self":
+                params = params[1:]
+
+            if not params:
+                should_call = True
+            else:
+                first = params[0]
+                if first.name != "scope":
+                    should_call = True
+                    if (
+                        first.default is inspect._empty
+                        and first.kind
+                        in (
+                            inspect.Parameter.POSITIONAL_ONLY,
+                            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                        )
+                    ):
+                        requires_path_arg = True
+
+        if should_call:
+            try:
+                candidate = (
+                    sse_attr("/sse") if requires_path_arg else sse_attr()
+                )
+            except TypeError:
+                candidate = sse_attr()
+
+    if candidate is None:
+        return None
+
+    wrapped = _wrap_sse_app_accept(candidate)
     try:
         setattr(mcp, "sse_app", wrapped)
     except Exception:
