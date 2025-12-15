@@ -1,7 +1,7 @@
 import inspect
 import os
 import requests
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from requests.auth import HTTPBasicAuth
 from slack_sdk import WebClient
@@ -46,6 +46,60 @@ def zendesk_add_internal_note(ticket_id: str, note: str, ctx: Context):
         timeout=30,
     )
     return {"status": "ok", "zendesk_status": r.status_code}
+
+
+@mcp.tool()
+def zendesk_list_recent_tickets(limit: int = 10, ctx: Context = None):
+    if ctx is None:
+        raise RuntimeError("Context is required")
+    require_key(ctx)
+    try:
+        limit_value = int(limit)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("limit must be an integer") from exc
+
+    limit_value = max(1, min(limit_value, 100))
+    params = {
+        "sort_by": "created_at",
+        "sort_order": "desc",
+        "per_page": limit_value,
+        "include": "users",
+    }
+
+    response = requests.get(
+        f"{ZENDESK_BASE}/tickets.json",
+        params=params,
+        auth=zendesk_auth,
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    data = response.json()
+    tickets: List[Dict[str, Any]] = data.get("tickets", [])[:limit_value]
+    users = {user.get("id"): user for user in data.get("users", [])}
+
+    normalized: List[Dict[str, Any]] = []
+    for ticket in tickets:
+        requester_id = ticket.get("requester_id")
+        requester = users.get(requester_id, {})
+        requester_name = (
+            requester.get("name")
+            or requester.get("email")
+            or requester_id
+        )
+
+        normalized.append(
+            {
+                "id": ticket.get("id"),
+                "subject": ticket.get("subject"),
+                "description": ticket.get("description"),
+                "requester": requester_name,
+                "created_at": ticket.get("created_at"),
+                "tags": ticket.get("tags") or [],
+            }
+        )
+
+    return normalized
 
 
 def _wrap_sse_app_accept(app: Callable):
