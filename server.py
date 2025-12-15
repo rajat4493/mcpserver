@@ -249,18 +249,18 @@ class RootApp:
         if scope["type"] != "http":
             return await self.sse_app(scope, receive, send)
 
-        path = (scope.get("path") or "").rstrip("/") or "/"
-        if path == "/health":
+        raw_path = scope.get("path") or ""
+        normalized_path = raw_path.rstrip("/") or "/"
+
+        if normalized_path == "/health":
             return await _send_json(send, 200, {"status": "ok"})
-        if path == "/sse":
-            sse_scope = scope
-            if scope.get("path") != "/sse":
-                sse_scope = dict(scope)
-                sse_scope["path"] = "/sse"
-            return await self.sse_app(sse_scope, receive, send)
-        if path == "/":
+        if normalized_path == "/":
             return await _send_text(send, 200, "MCP server is running. Use /health or /sse.")
-        return await _send_json(send, 404, {"error": "Not Found"})
+        if normalized_path == "/sse" and raw_path != "/sse":
+            sse_scope = dict(scope)
+            sse_scope["path"] = "/sse"
+            return await self.sse_app(sse_scope, receive, send)
+        return await self.sse_app(scope, receive, send)
 
 
 def main():
