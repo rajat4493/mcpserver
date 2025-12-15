@@ -56,6 +56,11 @@ def _require_key(ctx: Context):
 
 
 @mcp.tool()
+def ping():
+    return {"ok": True, "service": "mcpzd"}
+
+
+@mcp.tool()
 def slack_post_message(text: str, ctx: Context):
     _require_key(ctx)
     parts = text.split("|", 1)
